@@ -53,8 +53,8 @@ USAGE
 
       use Net::SFTP::SftpServer ( { log => 'local5' }, qw ( :LOG :ACTIONS ) );
 
-    Net::SFTP::SftpServer will default to using <i>daemon</i> see your
-    system's syslog documentation for more details
+    Net::SFTP::SftpServer will default to using "daemon" see your system's
+    syslog documentation for more details
 
     Options for object initialisation:
 
@@ -77,7 +77,7 @@ USAGE
         Octal dir permissions to force on creation of directories.
         Default=0777 or permissions specified by mkdir command from client
 
-    *   on_file_sent on_file_received
+    *   on_file_sent, on_file_received
 
         References to callback functions to be called on complete file sent
         or received. Function will be passed the full path and filename on
@@ -258,6 +258,7 @@ DEPENDENCIES
       Fcntl
       POSIX
       Sys::Syslog
+      Errno
 
 SEE ALSO
     Sftp protocol

@@ -87,7 +87,7 @@ require Exporter;
 use strict;
 use warnings;
 
-use version; our $VERSION = qv('1.0.2');
+use version; our $VERSION = qv('1.0.4');
 
 use Stat::lsMode;
 use Fcntl qw( O_RDWR O_CREAT O_TRUNC O_EXCL O_RDONLY O_WRONLY SEEK_SET );
@@ -1669,7 +1669,7 @@ Syslog output mode must be configured in the use statement of the module as foll
 
   use Net::SFTP::SftpServer ( { log => 'local5' }, qw ( :LOG :ACTIONS ) );
 
-Net::SFTP::SftpServer will default to using <i>daemon</i> see your system's syslog documentation for more details
+Net::SFTP::SftpServer will default to using C<daemon> see your system's syslog documentation for more details
 
 
 Options for object initialisation:
@@ -1702,7 +1702,7 @@ Octal dir permissions to force on creation of directories. Default=0777 or permi
 
 =item
 
-on_file_sent on_file_received
+on_file_sent, on_file_received
 
 References to callback functions to be called on complete file sent or received. Function will be passed the full path and filename on the filesystem as a single argument
 
@@ -1885,6 +1885,7 @@ This configuration:
   Fcntl
   POSIX
   Sys::Syslog
+  Errno
 
 =head1 SEE ALSO
 
