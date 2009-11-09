@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Net-SFTP-SftpServer
-version:             1.0.4
+version:             1.0.6
 abstract:            Secure File Transfer Protocol Server
 license:             ~
 author:              

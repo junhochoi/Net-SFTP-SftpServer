@@ -87,7 +87,7 @@ require Exporter;
 use strict;
 use warnings;
 
-use version; our $VERSION = qv('1.0.4');
+use version; our $VERSION = qv('1.0.6');
 
 use Stat::lsMode;
 use Fcntl qw( O_RDWR O_CREAT O_TRUNC O_EXCL O_RDONLY O_WRONLY SEEK_SET );
@@ -507,7 +507,7 @@ sub processInit {
   my $payload = shift;
 
   $self->{client_version} = $payload->getInt();
-  logDetail sprintf("client version %d", $self->{client_version});
+  logGeneral sprintf("processInit: client version %d", $self->{client_version});
 
   my $msg = pack('CN', SSH2_FXP_VERSION, SSH2_FILEXFER_VERSION);
   $self->sendMessage( $msg );
@@ -528,7 +528,7 @@ sub processOpen {
   my $perm = defined $self->{file_perms}                        ? $self->{file_perms}  :
              ($attr->{flags} & SSH2_FILEXFER_ATTR_PERMISSIONS)  ? $attr->{perm}        : 0666;
 
-  logDetail sprintf("open id %u name %s flags %d mode 0%o", $id, $name, $pflags, $perm);
+  logGeneral sprintf("processOpen: open id %u name %s flags %d mode 0%o", $id, $name, $pflags, $perm);
 
   return if $self->denyOperation(SSH2_FXP_OPEN, $id);
 
@@ -540,10 +540,15 @@ sub processOpen {
   }
 
   # is this an upload
+  # We use a tmp file if:
+  # We have specified use tmp upload
+  # And we have asked to create the file
+  # And we are opening for writing
+  # And we have either said to truncate the file on opening, or the file does not exist or is empty
   my $use_temp = ($self->{use_tmp_upload}  and
                   $pflags & SSH2_FXF_CREAT and
                   $pflags & SSH2_FXF_WRITE and
-                  $pflags & SSH2_FXF_TRUNC)     ? 1 : 0;
+                  ( $pflags & SSH2_FXF_TRUNC or -z $self->{home_dir} . $filename ) )    ? 1 : 0;
 
   my $fd = Net::SFTP::SftpServer::File->new($self->{home_dir} . $filename, $flags, $perm, $use_temp);
   if (not defined $fd) {
@@ -567,7 +572,7 @@ sub processClose {
 
   my $id     = $payload->getInt();
   my $handle = $payload->getString();
-  logDetail sprintf("close id %u handle %d", $id, $handle);
+  logGeneral sprintf("processClose: close id %u handle %d", $id, $handle);
 
   my $ret = -1;
   my $status;
@@ -605,7 +610,7 @@ sub processRead {
   my $off     = $payload->getInt64();
   my $len     = $payload->getInt();
 
-  logDetail sprintf("read id %u handle %d off %llu len %d", $id, $handle,$off, $len);
+  logDetail sprintf("processRead: read id %u handle %d off %llu len %d", $id, $handle,$off, $len);
 
   return if $self->denyOperation(SSH2_FXP_READ, $id);
 
@@ -647,7 +652,7 @@ sub processWrite {
   my $off     = $payload->getInt64();
   my $data    = $payload->getString();
 
-  logDetail sprintf("write id %u handle %d off %llu len %d", $id, $handle, $off, length $data);
+  logDetail sprintf("processWrite: write id %u handle %d off %llu len %d", $id, $handle, $off, length $data);
 
   return if $self->denyOperation(SSH2_FXP_WRITE, $id);
 
@@ -696,7 +701,7 @@ sub processDoStat{
   my $name = $payload->getString();
 
   my $filename = $self->makeSafeFileName($name);
-  logDetail sprintf("%sstat id %u name %s", $mode ? "l" : "", $id, $name);
+  logDetail sprintf("processStat: %sstat id %u name %s", $mode ? "l" : "", $id, $name);
 
   return if $self->denyOperation(($mode ? SSH2_FXP_LSTAT : SSH2_FXP_STAT), $id);
 
@@ -772,7 +777,7 @@ sub processSetstat {
 
   my $filename = $self->makeSafeFileName($name);
   my $attr = $payload->getAttrib();
-  logDetail sprintf("setstat id %u name %s", $id, $name);
+  logDetail sprintf("processSetstat: setstat id %u name %s", $id, $name);
 
   if ((not defined $filename) or ($self->{no_symlinks} and -l $self->{home_dir} . $filename)){
     $self->sendStatus( $id, SSH2_FX_NO_SUCH_FILE );
@@ -812,7 +817,7 @@ sub processOpendir {
 
   my $pathname = $self->makeSafeFileName($name);
 
-  logDetail sprintf("opendir id %u path %s", $id, $name);
+  logGeneral sprintf("processOpendir: opendir id %u path %s", $id, $name);
 
   return if $self->denyOperation(SSH2_FXP_OPENDIR, $id);
 
@@ -842,7 +847,7 @@ sub processReaddir {
   my $id      = $payload->getInt();
   my $handle  = $payload->getString();
 
-  logDetail(sprintf("readdir id %u handle %d", $id, $handle));
+  logDetail(sprintf("processReaddir: readdir id %u handle %d", $id, $handle));
 
   return if $self->denyOperation(SSH2_FXP_READDIR, $id);
 
@@ -887,7 +892,7 @@ sub processRemove {
   my $name    = $payload->getString();
   my $filename = $self->makeSafeFileName($name);
 
-  logDetail sprintf("remove id %u name %s", $id, $name);
+  logGeneral sprintf("processRemove: remove id %u name %s", $id, $name);
 
   return if $self->denyOperation(SSH2_FXP_REMOVE, $id);
 
@@ -916,7 +921,7 @@ sub processMkdir {
   my $mode = defined $self->{dir_perms}                         ? $self->{dir_perms}   :
              ($attr->{flags} & SSH2_FILEXFER_ATTR_PERMISSIONS)  ? $attr->{perm} & 0777 : 0777;
 
-  logDetail sprintf("mkdir id %u name %s mode 0%o", $id, $name, $mode);
+  logGeneral sprintf("processMkdir: mkdir id %u name %s mode 0%o", $id, $name, $mode);
 
   return if $self->denyOperation(SSH2_FXP_MKDIR, $id);
 
@@ -938,7 +943,7 @@ sub processRmdir {
   my $name     = $payload->getString();
   my $filename = $self->makeSafeFileName($name);
 
-  logDetail sprintf("rmdir id %u name %s", $id, $name);
+  logGeneral sprintf("processRmdir: rmdir id %u name %s", $id, $name);
 
   return if $self->denyOperation(SSH2_FXP_RMDIR, $id);
 
@@ -960,7 +965,7 @@ sub processRealpath {
   my $name     = $payload->getString();
   my $path     = $self->makeSafeFileName($name);
 
-  logDetail sprintf("realpath id %u path %s", $id, $name);
+  logDetail sprintf("processRealpath: realpath id %u path %s", $id, $name);
 
   my $file = { name => $path, long_name => $path, attrib => { flags => 0 } };
   $self->sendNames($id, [ $file ]);
@@ -976,7 +981,7 @@ sub processRename {
   my $nname    = $payload->getString();
   my $newpath  = $self->makeSafeFileName($nname);
 
-  logDetail sprintf("rename id %u old %s new %s", $id, $oname, $nname);
+  logGeneral sprintf("processRename: rename id %u old %s new %s", $id, $oname, $nname);
 
   return if $self->denyOperation(SSH2_FXP_RENAME, $id);
 
@@ -1133,7 +1138,15 @@ sub sendStatus {
     "Operation unsupported",  #/* SSH_FX_OP_UNSUPPORTED */
     "Unknown error"            #/* Others */
   );
-  logDetail "Sending status: $status message: $status_message[$status] id: $id";
+
+  my $sub  = [caller(1)]->[3]; # Get the sub that called me
+  if ($status != SSH2_FX_OK and $status != SSH2_FX_EOF ){
+    logGeneral "result: process: $sub  status: $status_message[$status]  id: $id";
+  }
+  else {
+    logDetail  "result: process: $sub  status: $status_message[$status]  id: $id";
+  }
+
   my $msg = pack('CNN', SSH2_FXP_STATUS, $id, $status);
   if ($self->{client_version} >= 3){
     $msg .= pack('N', length $status_message[$status]) . $status_message[$status] . pack('N', 0);
@@ -1405,6 +1418,7 @@ sub new {
 
   my $fd = $class->SUPER::new($filename, $mode, $perm);
 
+  return unless defined $fd;
 
   my $ident = scalar($fd);
   $filename_of{$ident} = $realfile;
@@ -1505,6 +1519,9 @@ sub getStats {
     my $speed = int($read_of{$ident} / (1024 * $dtime));
     $stats .= "Sent: $read_of{$ident} bytes in $dtime seconds Speed: $speed K/s";
   }
+  else {
+    $stats .= "No data sent or received";
+  }
   return $stats;
 }
 #-------------------------------------------------------------------------------
@@ -1550,6 +1567,8 @@ sub new {
   my $type = shift;
   my $class = ref($type) || $type || "Net::SFTP::SftpServer::Dir";
   my $fd = $class->SUPER::new(@_);
+
+  return unless defined $fd;
 
   my ($path) = @_;
   $path .= '/';
